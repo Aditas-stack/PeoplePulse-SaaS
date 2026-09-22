@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeoplePulse SaaS - Enterprise HR Analytics Suite</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FontAwesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <!-- SheetJS for XLSX importing and exporting -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: 'var(--brand-50, #f0f7ff)',
+                            100: 'var(--brand-100, #e0effe)',
+                            500: 'var(--brand-500, #2563eb)',
+                            600: 'var(--brand-600, #1d4ed8)',
+                            700: 'var(--brand-700, #1e40af)',
+                            900: 'var(--brand-900, #1e3a8a)'
+                        },
+                        darkbg: '#0b0f19',
+                        darkcard: '#111827',
+                        darkborder: '#1f2937'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --brand-primary: #2563eb;
+            --brand-hover: #1d4ed8;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .bg-brand-custom { background-color: var(--brand-primary) !important; }
+        .text-brand-custom { color: var(--brand-primary) !important; }
+        .border-brand-custom { border-color: var(--brand-primary) !important; }
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+    <header class="bg-darkcard border-b border-darkborder sticky top-0 z-30 no-print shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Branding Logo & Dynamic Title -->
+                <div class="flex items-center space-x-3">
+                    <div id="company-logo-container" class="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center min-w-[40px] h-[40px]">
+                        <i class="fa-solid fa-chart-pivot text-xl" id="company-logo-icon"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h1 id="company-name-display" class="font-extrabold text-lg tracking-tight text-white">PeoplePulse <span class="text-brand-custom">SaaS</span></h1>
+                            <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold">White-Label Edition</span>
+                        </div>
+                        <p class="text-xs text-slate-400" id="company-tagline-display">Enterprise HR Intelligence Platform</p>
+                    </div>
+                </div>
+
+                <!-- Global Action Controls -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <span id="record-count-badge" class="hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                        <i class="fa-solid fa-database mr-1.5 text-xs text-brand-custom"></i> <span id="badge-count">0</span> Records
+                    </span>
+
+                    <!-- Deployment & Hosting Guide Button -->
+                    <button onclick="app.openHostingGuideModal()" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-2 rounded-lg text-xs font-semibold flex items-center transition">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i> Launch & Sell SaaS
+                    </button>
+
+                    <!-- White Label Settings Button -->
+                    <button onclick="app.toggleWhiteLabelDrawer()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold flex items-center transition border border-slate-700">
+                        <i class="fa-solid fa-sliders mr-1.5 text-amber-400"></i> White Label
+                    </button>
+
+                    <!-- Export Excel -->
+                    <button onclick="app.exportMultiSheetExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center transition shadow-md">
+                        <i class="fa-solid fa-file-excel mr-1.5"></i> Export XLSX
+                    </button>
+                    
+                    <!-- Executive PDF Report -->
+                    <button onclick="app.openExecutiveReportModal()" class="bg-brand-custom hover:opacity-90 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center transition shadow-md">
+                        <i class="fa-solid fa-file-pdf mr-1.5"></i> Briefing Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-grow flex flex-col">
+
+        <!-- Global Filter Bar -->
+        <div class="bg-darkcard p-4 rounded-xl border border-darkborder mb-6 no-print shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                    <i class="fa-solid fa-filter text-brand-custom"></i>
+                    <span>Slicers & Filters:</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-grow md:max-w-3xl">
+                    <select id="filter-department" onchange="app.applyFilters()" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="ALL">All Departments</option>
+                    </select>
+
+                    <select id="filter-gender" onchange="app.applyFilters()" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="ALL">All Genders</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Non-Binary">Non-Binary</option>
+                    </select>
+
+                    <select id="filter-location" onchange="app.applyFilters()" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="ALL">All Work Models</option>
+                        <option value="On-site">On-site</option>
+                        <option value="Hybrid">Hybrid</option>
+                        <option value="Remote">Remote</option>
+                    </select>
+
+                    <select id="filter-attrition" onchange="app.applyFilters()" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="ALL">All Statuses</option>
+                        <option value="Active">Active Employees</option>
+                        <option value="Attrited">Attrited (Left)</option>
+                    </select>
+                </div>
+                <button onclick="app.resetFilters()" class="text-xs text-slate-400 hover:text-blue-400 font-medium underline flex items-center justify-center">
+                    Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="border-b border-darkborder mb-6 no-print overflow-x-auto custom-scrollbar">
+            <nav class="flex space-x-6 min-w-max" aria-label="Tabs">
+                <button onclick="app.switchTab('overview')" id="tab-btn-overview" class="tab-btn border-b-2 border-brand-custom text-brand-custom font-bold py-3 px-1 text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Executive Analytics</span>
+                </button>
+                <button onclick="app.switchTab('import-mapper')" id="tab-btn-import-mapper" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-1 text-sm font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-file-import text-amber-400"></i>
+                    <span>Import Data & Mapping</span>
+                </button>
+                <button onclick="app.switchTab('pivot-engine')" id="tab-btn-pivot-engine" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-1 text-sm font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-table-pivot text-indigo-400"></i>
+                    <span>Excel Pivot Analyzer</span>
+                </button>
+                <button onclick="app.switchTab('workforce-table')" id="tab-btn-workforce-table" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-1 text-sm font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-table"></i>
+                    <span>Data Directory</span>
+                </button>
+                <button onclick="app.switchTab('talent-retention')" id="tab-btn-talent-retention" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-1 text-sm font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-bullseye text-rose-400"></i>
+                    <span>9-Box & Risk Matrix</span>
+                </button>
+                <button onclick="app.switchTab('comp-equity')" id="tab-btn-comp-equity" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-1 text-sm font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-scale-balanced text-emerald-400"></i>
+                    <span>Pay Equity & Bands</span>
+                </button>
+                <button onclick="app.switchTab('data-prep')" id="tab-btn-data-prep" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-1 text-sm font-semibold flex items-center space-x-2">
+                    <i class="fa-solid fa-broom text-sky-400"></i>
+                    <span>Data Scrubbing</span>
+                </button>
+            </nav>
+        </div>
+
+        <main class="flex-grow">
+            
+            <!-- TAB 1: EXECUTIVE ANALYTICS -->
+            <section id="tab-overview" class="tab-content space-y-6">
+                <!-- Calculated Formula KPI Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Headcount</span>
+                            <span class="p-2 bg-blue-500/10 text-blue-400 rounded-lg text-xs"><i class="fa-solid fa-users"></i></span>
+                        </div>
+                        <p id="kpi-headcount" class="text-2xl font-extrabold mt-2 text-white">0</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Active: <span id="kpi-active-count" class="text-emerald-400 font-mono font-bold">0</span></p>
+                    </div>
+
+                    <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Turnover Rate</span>
+                            <span class="p-2 bg-rose-500/10 text-rose-400 rounded-lg text-xs"><i class="fa-solid fa-arrow-trend-down"></i></span>
+                        </div>
+                        <p id="kpi-turnover" class="text-2xl font-extrabold mt-2 text-white">0%</p>
+                        <p class="text-[11px] text-slate-400 mt-1"><span id="kpi-attrited-count" class="text-rose-400 font-mono font-bold">0</span> Total Attrited</p>
+                    </div>
+
+                    <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Avg Compa-Ratio</span>
+                            <span class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs"><i class="fa-solid fa-calculator"></i></span>
+                        </div>
+                        <p id="kpi-compa" class="text-2xl font-extrabold mt-2 text-white">0.00</p>
+                        <p class="text-[11px] text-slate-400 mt-1"><span id="kpi-compa-status" class="text-emerald-400 font-semibold">At Market Band</span></p>
+                    </div>
+
+                    <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Avg eNPS Rating</span>
+                            <span class="p-2 bg-amber-500/10 text-amber-400 rounded-lg text-xs"><i class="fa-solid fa-face-smile"></i></span>
+                        </div>
+                        <p id="kpi-enps" class="text-2xl font-extrabold mt-2 text-white">0.0 / 5</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Satisfaction Score</p>
+                    </div>
+
+                    <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Gender Pay Gap</span>
+                            <span class="p-2 bg-purple-500/10 text-purple-400 rounded-lg text-xs"><i class="fa-solid fa-scale-balanced"></i></span>
+                        </div>
+                        <p id="kpi-paygap" class="text-2xl font-extrabold mt-2 text-white">0%</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Male vs Female Gap</p>
+                    </div>
+
+                    <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Flight Risk</span>
+                            <span class="p-2 bg-red-500/10 text-red-400 rounded-lg text-xs"><i class="fa-solid fa-plane-departure"></i></span>
+                        </div>
+                        <p id="kpi-flightrisk" class="text-2xl font-extrabold mt-2 text-rose-400">0</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Key Personnel At Risk</p>
+                    </div>
+                </div>
+
+                <!-- Visual Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-darkcard p-5 rounded-xl border border-darkborder shadow-sm">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
+                            <span><i class="fa-solid fa-building mr-2 text-brand-custom"></i> Headcount & Attrition Rate by Department</span>
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-dept-headcount"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-darkcard p-5 rounded-xl border border-darkborder shadow-sm">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
+                            <span><i class="fa-solid fa-dollar-sign mr-2 text-emerald-500"></i> Salary Band Distribution & Compa-Ratio</span>
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-salary-dist"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-import-mapper" class="tab-content hidden space-y-6">
+                <div class="bg-darkcard p-6 rounded-xl border border-darkborder shadow-sm">
+                    <div class="flex items-center space-x-3 mb-6 pb-4 border-b border-darkborder">
+                        <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+                            <i class="fa-solid fa-file-import text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-white">Universal CSV / Excel Importer & Mapper</h3>
+                            <p class="text-xs text-slate-400">Upload any external client CSV or XLSX file and map custom columns to PeoplePulse schema</p>
+                        </div>
+                    </div>
+
+                    <!-- Drag & Drop File Upload Area -->
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-amber-500 rounded-2xl p-8 text-center transition bg-slate-900/40 cursor-pointer mb-6" onclick="document.getElementById('file-input-global').click()">
+                        <i class="fa-solid fa-cloud-arrow-up text-4xl text-amber-400 mb-3"></i>
+                        <h4 class="text-sm font-bold text-slate-200">Drag & Drop CSV or Excel (.XLSX) File Here</h4>
+                        <p class="text-xs text-slate-400 mt-1">Supports files with 1,000+ employee records instantly</p>
+                        <input type="file" id="file-input-global" accept=".csv,.xlsx,.xls" class="hidden" onchange="app.handleRawFileUpload(event)">
+                    </div>
+
+                    <!-- Intelligent Column Mapping Form (Hidden until file uploaded) -->
+                    <div id="column-mapping-panel" class="hidden space-y-6 bg-slate-900/60 p-6 rounded-xl border border-slate-800">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-white flex items-center">
+                                <i class="fa-solid fa-sliders text-amber-400 mr-2"></i> Map Your File Headers to Internal Schema
+                            </h4>
+                            <span id="detected-rows-count" class="text-xs font-mono bg-amber-950 text-amber-300 border border-amber-800 px-2.5 py-1 rounded-full">0 Rows Detected</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs" id="mapping-dropdowns-container">
+                            <!-- Populated via JS -->
+                        </div>
+
+                        <div class="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+                            <button onclick="app.cancelMapping()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs hover:bg-slate-700">Cancel</button>
+                            <button onclick="app.confirmAndProcessMapping()" class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-xs shadow-md">
+                                <i class="fa-solid fa-check mr-1.5"></i> Ingest & Process Records
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-pivot-engine" class="tab-content hidden space-y-6">
+                <div class="bg-darkcard p-6 rounded-xl border border-darkborder shadow-sm">
+                    <div class="flex items-center justify-between mb-6 pb-4 border-b border-darkborder">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                                <i class="fa-solid fa-table-pivot text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-white">Dynamic Pivot Table Engine</h3>
+                                <p class="text-xs text-slate-400">Analyze 1,000+ records across custom dimensions and aggregation formulas</p>
+                            </div>
+                        </div>
+                        <button onclick="app.resetPivotControls()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-lg font-mono text-slate-300">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reset Pivot
+                        </button>
+                    </div>
+
+                    <!-- Pivot Slicers -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-900/60 rounded-xl border border-slate-800 mb-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Row Dimension</label>
+                            <select id="pivot-row-select" onchange="app.updatePivotTable()" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5">
+                                <option value="department" selected>Department</option>
+                                <option value="role">Role Title</option>
+                                <option value="gender">Gender</option>
+                                <option value="location">Work Location</option>
+                                <option value="status">Status</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Column Dimension</label>
+                            <select id="pivot-col-select" onchange="app.updatePivotTable()" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5">
+                                <option value="NONE" selected>-- None (Flat Matrix) --</option>
+                                <option value="gender">Gender</option>
+                                <option value="location">Work Location</option>
+                                <option value="status">Status</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Calculation Field</label>
+                            <select id="pivot-metric-select" onchange="app.updatePivotTable()" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5">
+                                <option value="salary" selected>Annual Salary ($)</option>
+                                <option value="compaRatio">Compa-Ratio</option>
+                                <option value="perfRating">Performance Rating</option>
+                                <option value="satisfactionScore">Satisfaction Score</option>
+                                <option value="flightRiskScore">Flight Risk Score</option>
+                                <option value="tenure">Tenure (Years)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Aggregation Math</label>
+                            <select id="pivot-agg-select" onchange="app.updatePivotTable()" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 font-mono">
+                                <option value="AVERAGE" selected>AVERAGE()</option>
+                                <option value="SUM">SUM()</option>
+                                <option value="COUNT">COUNT()</option>
+                                <option value="MEDIAN">MEDIAN()</option>
+                                <option value="MIN">MIN()</option>
+                                <option value="MAX">MAX()</option>
+                                <option value="STDDEV">STDEV.P()</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Pivot Table Render Output -->
+                    <div class="overflow-x-auto custom-scrollbar border border-darkborder rounded-xl">
+                        <table id="pivot-rendered-table" class="w-full text-left text-xs font-mono">
+                            <thead id="pivot-table-head" class="bg-slate-800/80 text-blue-400 uppercase font-semibold border-b border-darkborder"></thead>
+                            <tbody id="pivot-table-body" class="divide-y divide-darkborder bg-slate-900/40 text-slate-300"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-workforce-table" class="tab-content hidden space-y-4">
+                <div class="bg-darkcard p-4 rounded-xl border border-darkborder shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+                    <div class="relative w-full md:w-80">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-xs text-slate-400"></i>
+                        <input id="table-search-input" onkeyup="app.handleSearch(this.value)" type="text" placeholder="Search 1,000+ records..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
+                        <button onclick="app.openEmployeeModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center transition">
+                            <i class="fa-solid fa-user-plus mr-1.5"></i> Add Record
+                        </button>
+
+                        <div class="flex items-center space-x-2 text-xs text-slate-400 font-mono">
+                            <button onclick="app.changePage(-1)" class="p-2 bg-slate-800 rounded hover:bg-slate-700"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span>Page <strong id="current-page-num" class="text-slate-100">1</strong> / <strong id="total-pages-num" class="text-slate-100">1</strong></span>
+                            <button onclick="app.changePage(1)" class="p-2 bg-slate-800 rounded hover:bg-slate-700"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-darkcard rounded-xl border border-darkborder shadow-sm overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-darkborder">
+                            <tr>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('empId')">ID <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('name')">Name <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('department')">Dept <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4">Role</th>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('salary')">Salary ($) <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('compaRatio')">Compa-Ratio <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('perfRating')">Perf Rating <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4 cursor-pointer hover:text-blue-400" onclick="app.sortTable('flightRiskScore')">Flight Risk <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="py-3 px-4">Status</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workforce-table-body" class="divide-y divide-darkborder text-slate-300 font-mono"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="tab-talent-retention" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-darkcard p-5 rounded-xl border border-darkborder shadow-sm">
+                        <h3 class="text-sm font-bold text-white mb-4 flex items-center">
+                            <i class="fa-solid fa-table-cells-large text-brand-custom mr-2"></i> Interactive 9-Box Performance & Potential Grid
+                        </h3>
+                        <div class="grid grid-cols-3 gap-3 text-center text-xs">
+                            <div class="p-3 rounded-lg bg-amber-950/30 border border-amber-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-amber-300">Enigma</span>
+                                <span id="box-9-count-1" class="text-2xl font-black font-mono text-amber-100">0</span>
+                                <span class="text-[10px] text-amber-400">High Pot / Low Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-indigo-950/30 border border-indigo-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-indigo-300">Growth Star</span>
+                                <span id="box-9-count-2" class="text-2xl font-black font-mono text-indigo-100">0</span>
+                                <span class="text-[10px] text-indigo-400">High Pot / Mid Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-emerald-300">Star Talent</span>
+                                <span id="box-9-count-3" class="text-2xl font-black font-mono text-emerald-100">0</span>
+                                <span class="text-[10px] text-emerald-400">High Pot / High Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex flex-col justify-between h-28">
+                                <span class="font-bold text-slate-300">Dilemma</span>
+                                <span id="box-9-count-4" class="text-2xl font-black font-mono text-slate-200">0</span>
+                                <span class="text-[10px] text-slate-400">Mid Pot / Low Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-blue-950/30 border border-blue-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-blue-300">Core Backbone</span>
+                                <span id="box-9-count-5" class="text-2xl font-black font-mono text-blue-100">0</span>
+                                <span class="text-[10px] text-blue-400">Mid Pot / Mid Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-indigo-950/30 border border-indigo-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-indigo-300">High Performer</span>
+                                <span id="box-9-count-6" class="text-2xl font-black font-mono text-indigo-100">0</span>
+                                <span class="text-[10px] text-indigo-400">Mid Pot / High Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-rose-950/30 border border-rose-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-rose-300">Underperformer</span>
+                                <span id="box-9-count-7" class="text-2xl font-black font-mono text-rose-100">0</span>
+                                <span class="text-[10px] text-rose-400">Low Pot / Low Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex flex-col justify-between h-28">
+                                <span class="font-bold text-slate-300">Effective Worker</span>
+                                <span id="box-9-count-8" class="text-2xl font-black font-mono text-slate-200">0</span>
+                                <span class="text-[10px] text-slate-400">Low Pot / Mid Perf</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-blue-950/30 border border-blue-800 flex flex-col justify-between h-28">
+                                <span class="font-bold text-blue-300">Workhorse Pro</span>
+                                <span id="box-9-count-9" class="text-2xl font-black font-mono text-blue-100">0</span>
+                                <span class="text-[10px] text-blue-400">Low Pot / High Perf</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-darkcard p-5 rounded-xl border border-darkborder shadow-sm flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-2 flex items-center">
+                                <i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i> Retention Risk Model
+                            </h3>
+                            <div class="h-56 relative mb-4">
+                                <canvas id="chart-flight-risk"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-comp-equity" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-darkcard p-5 rounded-xl border border-darkborder shadow-sm">
+                        <h3 class="text-sm font-bold text-white mb-2 flex items-center justify-between">
+                            <span><i class="fa-solid fa-venus-mars mr-2 text-purple-400"></i> Gender Pay Parity Benchmark</span>
+                            <span id="gender-gap-badge" class="text-xs px-2.5 py-1 bg-purple-900/40 text-purple-200 rounded-full font-mono font-bold">Gap: 0%</span>
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-gender-pay"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-darkcard p-5 rounded-xl border border-darkborder shadow-sm">
+                        <h3 class="text-sm font-bold text-white mb-2 flex items-center">
+                            <i class="fa-solid fa-scale-unbalanced mr-2 text-emerald-400"></i> Salary Bands Min/Avg/Max
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="chart-dept-salary-bands"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-data-prep" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-darkcard p-6 rounded-xl border border-darkborder shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center space-x-3 mb-3">
+                                <div class="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-white">Generate Sample Data</h3>
+                                    <p class="text-xs text-slate-400">1,000 synthetic HR records</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="app.generateSampleData(1000)" class="w-full bg-brand-custom hover:opacity-90 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>Load 1,000 Mock Records</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-darkcard p-6 rounded-xl border border-darkborder shadow-sm flex flex-col justify-between lg:col-span-2">
+                        <div>
+                            <div class="flex items-center space-x-3 mb-3">
+                                <div class="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                                    <i class="fa-solid fa-broom text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-white">Automated Data Scrubbing Pipeline</h3>
+                                    <p class="text-xs text-slate-400">Deduplicate ID fields and impute missing salary metrics</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="app.executeDataCleaning()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-gears"></i>
+                            <span>Run Data Cleaning & Quality Scrubbing</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-darkcard p-6 rounded-xl border border-darkborder shadow-sm">
+                    <h3 class="text-sm font-bold text-white mb-4 flex items-center">
+                        <i class="fa-solid fa-clipboard-check text-emerald-400 mr-2"></i> Data Quality Audit Metrics
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="p-3 bg-slate-800/60 rounded-lg text-center border border-slate-700">
+                            <span class="text-xs text-slate-400 uppercase font-bold">Total Rows</span>
+                            <p id="audit-total-rows" class="text-xl font-mono font-bold text-white mt-1">0</p>
+                        </div>
+                        <div class="p-3 bg-slate-800/60 rounded-lg text-center border border-slate-700">
+                            <span class="text-xs text-slate-400 uppercase font-bold">Duplicates Removed</span>
+                            <p id="audit-duplicates" class="text-xl font-mono font-bold text-amber-400 mt-1">0</p>
+                        </div>
+                        <div class="p-3 bg-slate-800/60 rounded-lg text-center border border-slate-700">
+                            <span class="text-xs text-slate-400 uppercase font-bold">Imputed Values</span>
+                            <p id="audit-imputed" class="text-xl font-mono font-bold text-blue-400 mt-1">0</p>
+                        </div>
+                        <div class="p-3 bg-slate-800/60 rounded-lg text-center border border-slate-700">
+                            <span class="text-xs text-slate-400 uppercase font-bold">Health Score</span>
+                            <p id="audit-health-score" class="text-xl font-mono font-bold text-emerald-400 mt-1">100%</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="whitelabel-drawer" class="fixed inset-y-0 right-0 w-80 bg-darkcard border-l border-darkborder shadow-2xl z-50 p-6 transform translate-x-full transition-transform duration-300 no-print flex flex-col justify-between">
+        <div>
+            <div class="flex items-center justify-between pb-4 mb-4 border-b border-darkborder">
+                <h3 class="font-bold text-white text-base flex items-center">
+                    <i class="fa-solid fa-sliders text-amber-400 mr-2"></i> White-Label Control
+                </h3>
+                <button onclick="app.toggleWhiteLabelDrawer()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block text-slate-400 font-medium mb-1">Company App Title</label>
+                    <input type="text" id="wl-company-name" value="PeoplePulse SaaS" onchange="app.updateWhiteLabelBranding()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100">
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 font-medium mb-1">App Subtitle / Tagline</label>
+                    <input type="text" id="wl-company-tagline" value="Enterprise HR Intelligence Platform" onchange="app.updateWhiteLabelBranding()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100">
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 font-medium mb-1">Brand Accent Color</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="color" id="wl-primary-color" value="#2563eb" onchange="app.updateWhiteLabelBranding()" class="bg-transparent cursor-pointer w-8 h-8 rounded border-0">
+                        <span id="wl-color-hex" class="font-mono text-slate-300">#2563eb</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 font-medium mb-1">Logo Icon FontAwesome Class</label>
+                    <input type="text" id="wl-logo-icon" value="fa-solid fa-chart-pivot" onchange="app.updateWhiteLabelBranding()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 font-medium mb-1">Turnover Target Alert Threshold (%)</label>
+                    <input type="number" id="wl-threshold-turnover" value="15" onchange="app.updateWhiteLabelBranding()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 border-t border-darkborder">
+            <button onclick="app.resetWhiteLabelDefaults()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold">Reset Defaults</button>
+        </div>
+    </div>
+
+    <div id="hosting-guide-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center hidden no-print">
+        <div class="bg-darkcard border border-darkborder rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 shadow-2xl flex flex-col justify-between">
+            <div class="space-y-4 text-xs">
+                <div class="flex items-center justify-between border-b border-darkborder pb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-xl"></i>
+                        <h3 class="font-bold text-white text-base">Commercial Deployment & Selling Guide</h3>
+                    </div>
+                    <button onclick="app.closeHostingGuideModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+                </div>
+
+                <div class="bg-indigo-950/40 border border-indigo-800 p-4 rounded-xl leading-relaxed text-indigo-200">
+                    <p class="font-bold text-white mb-1"><i class="fa-solid fa-circle-check mr-1 text-emerald-400"></i> Zero Server / Zero Database Required</p>
+                    <p>This application is completely self-contained in a single HTML file. All employee data parsing, Excel formulas, charts, and IndexedDB local caching happen entirely in the client browser. You do NOT need expensive backend servers or SQL databases to sell this tool to businesses.</p>
+                </div>
+
+                <div class="space-y-3 text-slate-300">
+                    <h4 class="font-bold text-white text-sm">1. Free Hosting Platforms (Deploy in under 3 minutes)</h4>
+                    <ul class="list-disc pl-5 space-y-1 font-mono text-[11px]">
+                        <li><strong>GitHub Pages:</strong> Upload `index.html` to a public GitHub repository, enable GitHub Pages in Settings -> Pages.</li>
+                        <li><strong>Netlify:</strong> Drag and drop your folder containing `index.html` onto Netlify Drop page (`app.netlify.com/drop`).</li>
+                        <li><strong>Vercel:</strong> Import your GitHub repo to Vercel for instant free global CDN hosting.</li>
+                    </ul>
+
+                    <h4 class="font-bold text-white text-sm">2. Connecting a Custom Domain Name</h4>
+                    <p>Register a custom domain like <code class="bg-slate-800 px-1 py-0.5 rounded text-amber-300 font-mono">www.yourhrtool.com</code> on Namecheap, GoDaddy, or Cloudflare, and point CNAME records to Netlify / Vercel / GitHub Pages.</p>
+
+                    <h4 class="font-bold text-white text-sm">3. Commercial Monetization Strategies</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><strong>White-Label Enterprise License:</strong> Charge HR consulting clients $500 - $2,500 one-time fee for a custom branded instance.</li>
+                        <li><strong>Monthly SaaS Subscription:</strong> Offer client access via password protection or Lemonsqueezy / Gumroad license keys.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-darkborder flex justify-end">
+                <button onclick="app.closeHostingGuideModal()" class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-500">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="executive-report-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center hidden no-print">
+        <div class="bg-darkcard border border-darkborder rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar p-8 shadow-2xl flex flex-col justify-between">
+            <div id="printable-report-content" class="bg-white text-slate-900 p-8 rounded-xl space-y-6">
+                <div class="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+                    <div>
+                        <h1 class="text-2xl font-black uppercase tracking-tight text-slate-900" id="rep-company-title">Executive HR Briefing Report</h1>
+                        <p class="text-xs font-mono text-slate-500">PeoplePulse SaaS Platform | Confidential</p>
+                    </div>
+                    <div class="text-right font-mono text-xs text-slate-500">
+                        <p>Date: <span id="report-date-stamp"></span></p>
+                        <p>Status: Verified Audit</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-4 text-center">
+                    <div class="p-3 bg-slate-100 rounded-lg border border-slate-300">
+                        <span class="text-[10px] font-bold uppercase text-slate-500">Workforce</span>
+                        <p id="rep-kpi-headcount" class="text-lg font-bold font-mono text-slate-900">0</p>
+                    </div>
+                    <div class="p-3 bg-slate-100 rounded-lg border border-slate-300">
+                        <span class="text-[10px] font-bold uppercase text-slate-500">Turnover %</span>
+                        <p id="rep-kpi-turnover" class="text-lg font-bold font-mono text-slate-900">0%</p>
+                    </div>
+                    <div class="p-3 bg-slate-100 rounded-lg border border-slate-300">
+                        <span class="text-[10px] font-bold uppercase text-slate-500">Avg Salary</span>
+                        <p id="rep-kpi-salary" class="text-lg font-bold font-mono text-slate-900">$0</p>
+                    </div>
+                    <div class="p-3 bg-slate-100 rounded-lg border border-slate-300">
+                        <span class="text-[10px] font-bold uppercase text-slate-500">Compa-Ratio</span>
+                        <p id="rep-kpi-compa" class="text-lg font-bold font-mono text-slate-900">0.00</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 mb-2 border-b border-slate-200 pb-1">1. Strategic Overview</h3>
+                    <p id="report-summary-p" class="text-xs text-slate-700 leading-relaxed">
+                        Automated workforce intelligence metrics computed across active and historical personnel records.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-6 border-t border-darkborder no-print">
+                <button onclick="app.closeExecutiveReportModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs hover:bg-slate-700">Close</button>
+                <button onclick="window.print()" class="px-5 py-2 bg-brand-custom text-white rounded-lg text-xs font-semibold flex items-center">
+                    <i class="fa-solid fa-print mr-2"></i> Print / Save PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="employee-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden no-print">
+        <div class="bg-darkcard border border-darkborder rounded-xl p-6 w-full max-w-lg shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="font-bold text-white text-base">Edit Employee Record</h3>
+                <button onclick="app.closeEmployeeModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="employee-form" onsubmit="app.saveEmployeeForm(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="form-emp-id">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Full Name</label>
+                        <input type="text" id="form-name" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Department</label>
+                        <select id="form-department" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100">
+                            <option value="Engineering">Engineering</option>
+                            <option value="Sales">Sales</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Human Resources">Human Resources</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Product">Product</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Role Title</label>
+                        <input type="text" id="form-role" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Annual Salary ($)</label>
+                        <input type="number" id="form-salary" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Perf Score (1-5)</label>
+                        <input type="number" step="0.1" min="1" max="5" id="form-perf" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Satisfaction (1-5)</label>
+                        <input type="number" step="0.1" min="1" max="5" id="form-sat" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Status</label>
+                        <select id="form-status" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-100">
+                            <option value="Active">Active</option>
+                            <option value="Attrited">Attrited</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3 border-t border-darkborder">
+                    <button type="button" onclick="app.closeEmployeeModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-custom text-white rounded-lg hover:opacity-90 font-medium">Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        class CommercialHRAnalyticsApp {
+            constructor() {
+                this.rawData = [];
+                this.filteredData = [];
+                this.rawImportParsed = [];
+                this.rawImportHeaders = [];
+                this.charts = {};
+                this.currentPage = 1;
+                this.pageSize = 12;
+                this.sortColumn = 'empId';
+                this.sortAscending = true;
+
+                this.whiteLabel = {
+                    companyName: "PeoplePulse SaaS",
+                    companyTagline: "Enterprise HR Intelligence Platform",
+                    primaryColor: "#2563eb",
+                    logoIcon: "fa-solid fa-chart-pivot",
+                    turnoverThreshold: 15
+                };
+
+                this.deptMidpoints = {
+                    "Engineering": 110000,
+                    "Product": 105000,
+                    "Sales": 85000,
+                    "Finance": 90000,
+                    "Marketing": 78000,
+                    "Human Resources": 75000
+                };
+
+                this.loadSavedWhiteLabelSettings();
+            }
+
+            // LocalStorage Persistence for White Label Controls
+            loadSavedWhiteLabelSettings() {
+                const saved = localStorage.getItem('peoplepulse_whitelabel_settings');
+                if (saved) {
+                    try {
+                        this.whiteLabel = JSON.parse(saved);
+                    } catch(e) {}
+                }
+                this.applyWhiteLabelToUI();
+            }
+
+            saveWhiteLabelSettings() {
+                localStorage.setItem('peoplepulse_whitelabel_settings', JSON.stringify(this.whiteLabel));
+            }
+
+            applyWhiteLabelToUI() {
+                document.getElementById('company-name-display').innerHTML = `${this.whiteLabel.companyName} <span class="text-brand-custom">SaaS</span>`;
+                document.getElementById('company-tagline-display').innerText = this.whiteLabel.companyTagline;
+                document.getElementById('rep-company-title').innerText = `${this.whiteLabel.companyName} Executive HR Briefing`;
+
+                document.documentElement.style.setProperty('--brand-primary', this.whiteLabel.primaryColor);
+                document.getElementById('wl-color-hex').innerText = this.whiteLabel.primaryColor;
+
+                const icon = document.getElementById('company-logo-icon');
+                if (icon) icon.className = `${this.whiteLabel.logoIcon} text-xl`;
+
+                document.getElementById('wl-company-name').value = this.whiteLabel.companyName;
+                document.getElementById('wl-company-tagline').value = this.whiteLabel.companyTagline;
+                document.getElementById('wl-primary-color').value = this.whiteLabel.primaryColor;
+                document.getElementById('wl-logo-icon').value = this.whiteLabel.logoIcon;
+                document.getElementById('wl-threshold-turnover').value = this.whiteLabel.turnoverThreshold;
+            }
+
+            updateWhiteLabelBranding() {
+                this.whiteLabel.companyName = document.getElementById('wl-company-name').value;
+                this.whiteLabel.companyTagline = document.getElementById('wl-company-tagline').value;
+                this.whiteLabel.primaryColor = document.getElementById('wl-primary-color').value;
+                this.whiteLabel.logoIcon = document.getElementById('wl-logo-icon').value;
+                this.whiteLabel.turnoverThreshold = parseFloat(document.getElementById('wl-threshold-turnover').value) || 15;
+
+                this.saveWhiteLabelSettings();
+                this.applyWhiteLabelToUI();
+            }
+
+            resetWhiteLabelDefaults() {
+                this.whiteLabel = {
+                    companyName: "PeoplePulse SaaS",
+                    companyTagline: "Enterprise HR Intelligence Platform",
+                    primaryColor: "#2563eb",
+                    logoIcon: "fa-solid fa-chart-pivot",
+                    turnoverThreshold: 15
+                };
+                this.saveWhiteLabelSettings();
+                this.applyWhiteLabelToUI();
+            }
+
+            toggleWhiteLabelDrawer() {
+                const drawer = document.getElementById('whitelabel-drawer');
+                drawer.classList.toggle('translate-x-full');
+            }
+
+            openHostingGuideModal() {
+                document.getElementById('hosting-guide-modal').classList.remove('hidden');
+            }
+
+            closeHostingGuideModal() {
+                document.getElementById('hosting-guide-modal').classList.add('hidden');
+            }
+
+            handleRawFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const fileName = file.name.toLowerCase();
+                if (fileName.endsWith('.csv')) {
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            this.setupColumnMappingPanel(results.data, results.meta.fields || []);
+                        }
+                    });
+                } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                        if (json.length > 0) {
+                            const headers = json[0];
+                            const rows = json.slice(1).map(rowArray => {
+                                let obj = {};
+                                headers.forEach((h, idx) => { obj[h] = rowArray[idx]; });
+                                return obj;
+                            });
+                            this.setupColumnMappingPanel(rows, headers);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            }
+
+            setupColumnMappingPanel(rows, headers) {
+                this.rawImportParsed = rows;
+                this.rawImportHeaders = headers;
+
+                document.getElementById('column-mapping-panel').classList.remove('hidden');
+                document.getElementById('detected-rows-count').innerText = `${rows.length.toLocaleString()} Rows Detected`;
+
+                const schemaFields = [
+                    { id: 'empId', label: 'Employee ID', required: true },
+                    { id: 'name', label: 'Full Name', required: true },
+                    { id: 'department', label: 'Department', required: true },
+                    { id: 'role', label: 'Role Title', required: true },
+                    { id: 'salary', label: 'Annual Salary ($)', required: true },
+                    { id: 'gender', label: 'Gender', required: false },
+                    { id: 'location', label: 'Work Location', required: false },
+                    { id: 'perfRating', label: 'Performance Rating (1-5)', required: false },
+                    { id: 'satisfactionScore', label: 'Satisfaction Score (1-5)', required: false },
+                    { id: 'status', label: 'Status (Active/Attrited)', required: false }
+                ];
+
+                const container = document.getElementById('mapping-dropdowns-container');
+                container.innerHTML = '';
+
+                schemaFields.forEach(field => {
+                    // Auto-guess matched header
+                    const guessed = headers.find(h => h.toLowerCase().includes(field.id.toLowerCase()) || h.toLowerCase().includes(field.label.toLowerCase())) || 'NONE';
+
+                    let optionsHTML = `<option value="NONE">-- Select Column --</option>`;
+                    headers.forEach(h => {
+                        optionsHTML += `<option value="${h}" ${h === guessed ? 'selected' : ''}>${h}</option>`;
+                    });
+
+                    container.innerHTML += `
+                        <div>
+                            <label class="block font-medium text-slate-300 mb-1">${field.label} ${field.required ? '<span class="text-rose-400">*</span>' : ''}</label>
+                            <select id="map-select-${field.id}" class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5">
+                                ${optionsHTML}
+                            </select>
+                        </div>
+                    `;
+                });
+            }
+
+            confirmAndProcessMapping() {
+                const getMappedVal = (row, fieldId, defaultVal) => {
+                    const sel = document.getElementById(`map-select-${fieldId}`);
+                    const header = sel ? sel.value : 'NONE';
+                    return (header !== 'NONE' && row[header] !== undefined) ? row[header] : defaultVal;
+                };
+
+                const processed = this.rawImportParsed.map((row, idx) => {
+                    return this.calculateCalculatedFields({
+                        empId: String(getMappedVal(row, 'empId', `EMP-${idx + 1}`)),
+                        name: String(getMappedVal(row, 'name', `Employee ${idx + 1}`)),
+                        department: String(getMappedVal(row, 'department', 'General')),
+                        role: String(getMappedVal(row, 'role', 'Staff')),
+                        salary: parseFloat(getMappedVal(row, 'salary', 75000)) || 75000,
+                        gender: String(getMappedVal(row, 'gender', 'Unspecified')),
+                        location: String(getMappedVal(row, 'location', 'On-site')),
+                        perfRating: parseFloat(getMappedVal(row, 'perfRating', 3.5)) || 3.5,
+                        satisfactionScore: parseFloat(getMappedVal(row, 'satisfactionScore', 3.5)) || 3.5,
+                        engagementScore: 3.5,
+                        overtimeHours: 5,
+                        tenure: 2.0,
+                        status: String(getMappedVal(row, 'status', 'Active'))
+                    });
+                });
+
+                this.rawData = processed;
+                this.populateFilterDropdowns();
+                this.applyFilters();
+                this.cancelMapping();
+                this.switchTab('overview');
+            }
+
+            cancelMapping() {
+                document.getElementById('column-mapping-panel').classList.add('hidden');
+            }
+
+            calculateCalculatedFields(emp) {
+                const midpoint = this.deptMidpoints[emp.department] || 85000;
+                const compaRatio = parseFloat((emp.salary / midpoint).toFixed(2));
+
+                const satisfactionWeight = (5 - emp.satisfactionScore) * 0.4;
+                const engagementWeight = (5 - (emp.engagementScore || 3.5)) * 0.3;
+                const overtimeWeight = Math.min(2, (emp.overtimeHours || 5) / 10) * 0.3;
+                const flightRiskScore = parseFloat((satisfactionWeight + engagementWeight + overtimeWeight).toFixed(2));
+
+                return { ...emp, compaRatio, flightRiskScore };
+            }
+
+            generateSampleData(count = 1000) {
+                const firstNames = ["Alex", "Jordan", "Taylor", "Morgan", "Sam", "Chris", "Pat", "Riley", "Avery", "Dakota"];
+                const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis"];
+                const departments = ["Engineering", "Sales", "Marketing", "Human Resources", "Finance", "Product"];
+                const roles = {
+                    "Engineering": ["Software Engineer", "Senior Dev", "DevOps Lead"],
+                    "Sales": ["Sales Exec", "Account Mgr", "Sales Rep"],
+                    "Marketing": ["Content Lead", "Growth Marketer"],
+                    "Human Resources": ["HR Generalist", "Recruiter"],
+                    "Finance": ["Financial Analyst", "Accountant"],
+                    "Product": ["Product Manager", "UI/UX Designer"]
+                };
+                const genders = ["Male", "Female", "Non-Binary"];
+                const locations = ["On-site", "Hybrid", "Remote"];
+
+                const generated = [];
+                for (let i = 1; i <= count; i++) {
+                    const dept = departments[Math.floor(Math.random() * departments.length)];
+                    const role = roles[dept][Math.floor(Math.random() * roles[dept].length)];
+                    const gender = genders[Math.floor(Math.random() * genders.length)];
+                    const location = locations[Math.floor(Math.random() * locations.length)];
+                    
+                    const baseSalary = Math.round(this.deptMidpoints[dept] * (0.75 + Math.random() * 0.5));
+                    const perfRating = parseFloat((Math.random() * 2 + 3).toFixed(1));
+                    const satScore = parseFloat((Math.random() * 3 + 2).toFixed(1));
+                    const isAttrited = (satScore < 2.8 && Math.random() < 0.4) || (Math.random() < 0.08);
+
+                    const emp = {
+                        empId: `EMP-${String(i).padStart(4, '0')}`,
+                        name: `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`,
+                        department: dept,
+                        role: role,
+                        gender: gender,
+                        location: location,
+                        salary: baseSalary,
+                        tenure: parseFloat((Math.random() * 8 + 0.5).toFixed(1)),
+                        perfRating: perfRating,
+                        satisfactionScore: satScore,
+                        engagementScore: parseFloat((Math.random() * 3 + 2).toFixed(1)),
+                        overtimeHours: Math.floor(Math.random() * 25),
+                        status: isAttrited ? "Attrited" : "Active"
+                    };
+
+                    generated.push(this.calculateCalculatedFields(emp));
+                }
+
+                this.rawData = generated;
+                this.populateFilterDropdowns();
+                this.applyFilters();
+                this.updateAuditReport(count, 0, 0, 100);
+            }
+
+            updatePivotTable() {
+                const rowKey = document.getElementById('pivot-row-select').value;
+                const colKey = document.getElementById('pivot-col-select').value;
+                const metricKey = document.getElementById('pivot-metric-select').value;
+                const aggFunc = document.getElementById('pivot-agg-select').value;
+
+                const thead = document.getElementById('pivot-table-head');
+                const tbody = document.getElementById('pivot-table-body');
+
+                thead.innerHTML = '';
+                tbody.innerHTML = '';
+
+                const rowValues = [...new Set(this.filteredData.map(d => d[rowKey]))].sort();
+                const colValues = colKey !== 'NONE' ? [...new Set(this.filteredData.map(d => d[colKey]))].sort() : ['Value'];
+
+                let headerHTML = `<tr><th class="py-3 px-4 bg-slate-800 text-slate-200 border-b border-darkborder">${rowKey.toUpperCase()}</th>`;
+                colValues.forEach(colVal => { headerHTML += `<th class="py-3 px-4 text-center border-b border-darkborder">${colVal}</th>`; });
+                headerHTML += `<th class="py-3 px-4 text-right bg-slate-800 text-blue-400 border-b border-darkborder">TOTAL (${aggFunc})</th></tr>`;
+                thead.innerHTML = headerHTML;
+
+                rowValues.forEach(rVal => {
+                    let rowHTML = `<tr><td class="py-2.5 px-4 font-bold text-slate-200 bg-slate-900/80 border-b border-darkborder">${rVal}</td>`;
+                    let allRowMetrics = [];
+
+                    colValues.forEach(cVal => {
+                        const matchingEmps = this.filteredData.filter(d => d[rowKey] === rVal && (colKey === 'NONE' || d[colKey] === cVal));
+                        const metricValues = matchingEmps.map(e => Number(e[metricKey]) || 0);
+                        allRowMetrics = allRowMetrics.concat(metricValues);
+
+                        rowHTML += `<td class="py-2.5 px-4 text-center border-b border-darkborder">${this.computeExcelAgg(metricValues, aggFunc)}</td>`;
+                    });
+
+                    rowHTML += `<td class="py-2.5 px-4 text-right font-bold text-blue-400 bg-slate-900/80 border-b border-darkborder">${this.computeExcelAgg(allRowMetrics, aggFunc)}</td></tr>`;
+                    tbody.innerHTML += rowHTML;
+                });
+            }
+
+            computeExcelAgg(arr, func) {
+                if (!arr || arr.length === 0) return '-';
+                switch (func) {
+                    case 'SUM':
+                        const sum = arr.reduce((a, b) => a + b, 0);
+                        return sum > 1000 ? `$${Math.round(sum).toLocaleString()}` : sum.toFixed(1);
+                    case 'AVERAGE':
+                        const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+                        return avg > 1000 ? `$${Math.round(avg).toLocaleString()}` : avg.toFixed(2);
+                    case 'COUNT':
+                        return arr.length;
+                    case 'MIN':
+                        const min = Math.min(...arr);
+                        return min > 1000 ? `$${Math.round(min).toLocaleString()}` : min.toFixed(2);
+                    case 'MAX':
+                        const max = Math.max(...arr);
+                        return max > 1000 ? `$${Math.round(max).toLocaleString()}` : max.toFixed(2);
+                    default:
+                        return '-';
+                }
+            }
+
+            exportMultiSheetExcel() {
+                if (this.filteredData.length === 0) return;
+                const wsRaw = XLSX.utils.json_to_sheet(this.filteredData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, wsRaw, "Workforce Raw Data");
+                XLSX.writeFile(wb, `${this.whiteLabel.companyName.replace(/\s+/g, '_')}_HR_Export.xlsx`);
+            }
+
+            openExecutiveReportModal() {
+                document.getElementById('executive-report-modal').classList.remove('hidden');
+                document.getElementById('report-date-stamp').innerText = new Date().toLocaleDateString();
+
+                const total = this.filteredData.length;
+                const attrited = this.filteredData.filter(d => d.status === 'Attrited').length;
+                const avgSalary = Math.round(this.filteredData.reduce((a, b) => a + b.salary, 0) / (total || 1));
+
+                document.getElementById('rep-kpi-headcount').innerText = total.toLocaleString();
+                document.getElementById('rep-kpi-turnover').innerText = `${((attrited / (total || 1)) * 100).toFixed(1)}%`;
+                document.getElementById('rep-kpi-salary').innerText = `$${avgSalary.toLocaleString()}`;
+                document.getElementById('rep-kpi-compa').innerText = (this.filteredData.reduce((a, b) => a + b.compaRatio, 0) / (total || 1)).toFixed(2);
+            }
+
+            closeExecutiveReportModal() {
+                document.getElementById('executive-report-modal').classList.add('hidden');
+            }
+
+            renderAllCharts() {
+                this.renderDeptHeadcountChart();
+                this.renderSalaryDistChart();
+                this.renderFlightRiskChart();
+                this.renderGenderPayChart();
+                this.renderDeptSalaryBandsChart();
+            }
+
+            renderDeptHeadcountChart() {
+                const ctx = document.getElementById('chart-dept-headcount')?.getContext('2d');
+                if (!ctx) return;
+                const depts = [...new Set(this.filteredData.map(d => d.department))];
+                const counts = depts.map(d => this.filteredData.filter(emp => emp.department === d).length);
+
+                if (this.charts.deptHeadcount) this.charts.deptHeadcount.destroy();
+                this.charts.deptHeadcount = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: depts, datasets: [{ label: 'Headcount', data: counts, backgroundColor: this.whiteLabel.primaryColor, borderRadius: 6 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+            }
+
+            renderSalaryDistChart() {
+                const ctx = document.getElementById('chart-salary-dist')?.getContext('2d');
+                if (!ctx) return;
+                const depts = [...new Set(this.filteredData.map(d => d.department))];
+                const compas = depts.map(d => {
+                    const emps = this.filteredData.filter(e => e.department === d);
+                    return emps.length ? (emps.reduce((a, b) => a + b.compaRatio, 0) / emps.length).toFixed(2) : 0;
+                });
+
+                if (this.charts.salaryDist) this.charts.salaryDist.destroy();
+                this.charts.salaryDist = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: depts, datasets: [{ label: 'Compa-Ratio', data: compas, borderColor: '#10b981', fill: false }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            renderFlightRiskChart() {
+                const ctx = document.getElementById('chart-flight-risk')?.getContext('2d');
+                if (!ctx) return;
+                let high = 0, med = 0, low = 0;
+                this.filteredData.forEach(e => {
+                    if (e.flightRiskScore > 2.2) high++;
+                    else if (e.flightRiskScore > 1.4) med++;
+                    else low++;
+                });
+
+                if (this.charts.flightRisk) this.charts.flightRisk.destroy();
+                this.charts.flightRisk = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels: ['High Risk', 'Medium', 'Low'], datasets: [{ data: [high, med, low], backgroundColor: ['#f43f5e', '#f59e0b', '#10b981'] }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            renderGenderPayChart() {
+                const ctx = document.getElementById('chart-gender-pay')?.getContext('2d');
+                if (!ctx) return;
+                const males = this.filteredData.filter(d => d.gender === 'Male');
+                const females = this.filteredData.filter(d => d.gender === 'Female');
+                const avgM = males.length ? Math.round(males.reduce((a, b) => a + b.salary, 0) / males.length) : 0;
+                const avgF = females.length ? Math.round(females.reduce((a, b) => a + b.salary, 0) / females.length) : 0;
+
+                if (this.charts.genderPay) this.charts.genderPay.destroy();
+                this.charts.genderPay = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: ['Male Avg', 'Female Avg'], datasets: [{ data: [avgM, avgF], backgroundColor: ['#3b82f6', '#ec4899'] }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            renderDeptSalaryBandsChart() {
+                const ctx = document.getElementById('chart-dept-salary-bands')?.getContext('2d');
+                if (!ctx) return;
+                const depts = [...new Set(this.filteredData.map(d => d.department))];
+                const avgS = depts.map(d => {
+                    const emps = this.filteredData.filter(e => e.department === d);
+                    return emps.length ? Math.round(emps.reduce((a, b) => a + b.salary, 0) / emps.length) : 0;
+                });
+
+                if (this.charts.deptBands) this.charts.deptBands.destroy();
+                this.charts.deptBands = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: depts, datasets: [{ label: 'Avg Salary', data: avgS, backgroundColor: '#2563eb' }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            render9BoxGrid() {
+                let boxCounts = Array(10).fill(0);
+                this.filteredData.forEach(e => {
+                    if (e.perfRating >= 4.0 && e.satisfactionScore >= 4.0) boxCounts[3]++;
+                    else if (e.perfRating >= 4.0) boxCounts[6]++;
+                    else boxCounts[5]++;
+                });
+                for (let i = 1; i <= 9; i++) {
+                    const el = document.getElementById(`box-9-count-${i}`);
+                    if (el) el.innerText = boxCounts[i];
+                }
+            }
+
+            renderWorkforceTable() {
+                const tbody = document.getElementById('workforce-table-body');
+                tbody.innerHTML = '';
+                const sorted = [...this.filteredData].sort((a, b) => (a[this.sortColumn] < b[this.sortColumn] ? (this.sortAscending ? -1 : 1) : (this.sortAscending ? 1 : -1)));
+                const pageData = sorted.slice((this.currentPage - 1) * this.pageSize, this.currentPage * this.pageSize);
+
+                pageData.forEach(emp => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-800/50">
+                            <td class="py-3 px-4 text-blue-400 font-medium">${emp.empId}</td>
+                            <td class="py-3 px-4 font-sans font-semibold text-white">${emp.name}</td>
+                            <td class="py-3 px-4 font-sans">${emp.department}</td>
+                            <td class="py-3 px-4 font-sans">${emp.role}</td>
+                            <td class="py-3 px-4 font-bold text-slate-100">$${emp.salary.toLocaleString()}</td>
+                            <td class="py-3 px-4">${emp.compaRatio}</td>
+                            <td class="py-3 px-4">${emp.perfRating}</td>
+                            <td class="py-3 px-4">${emp.flightRiskScore}</td>
+                            <td class="py-3 px-4 font-sans"><span class="px-2 py-0.5 rounded-full text-[10px] ${emp.status === 'Active' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">${emp.status}</span></td>
+                            <td class="py-3 px-4 text-right space-x-2">
+                                <button onclick="app.editEmployee('${emp.empId}')" class="text-slate-400 hover:text-blue-400"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button onclick="app.deleteEmployee('${emp.empId}')" class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                document.getElementById('current-page-num').innerText = this.currentPage;
+                document.getElementById('total-pages-num').innerText = Math.ceil(sorted.length / this.pageSize) || 1;
+            }
+
+            renderKPIs() {
+                const total = this.filteredData.length;
+                if (!total) return;
+                const attrited = this.filteredData.filter(d => d.status === 'Attrited').length;
+                const turnover = ((attrited / total) * 100).toFixed(1);
+
+                document.getElementById('kpi-headcount').innerText = total.toLocaleString();
+                document.getElementById('badge-count').innerText = total.toLocaleString();
+                document.getElementById('kpi-active-count').innerText = (total - attrited).toLocaleString();
+                document.getElementById('kpi-turnover').innerText = `${turnover}%`;
+                document.getElementById('kpi-attrited-count').innerText = attrited;
+                document.getElementById('kpi-compa').innerText = (this.filteredData.reduce((a, b) => a + b.compaRatio, 0) / total).toFixed(2);
+                document.getElementById('kpi-enps').innerText = `${(this.filteredData.reduce((a, b) => a + b.satisfactionScore, 0) / total).toFixed(1)} / 5`;
+                document.getElementById('kpi-flightrisk').innerText = this.filteredData.filter(d => d.flightRiskScore > 2.0).length;
+            }
+
+            executeDataCleaning() {
+                const seen = new Set();
+                this.rawData = this.rawData.filter(e => {
+                    if (seen.has(e.empId)) return false;
+                    seen.add(e.empId);
+                    return true;
+                });
+                this.applyFilters();
+                this.updateAuditReport(this.rawData.length, 0, 0, 100);
+            }
+
+            updateAuditReport(total, dupes, imputed, health) {
+                document.getElementById('audit-total-rows').innerText = total.toLocaleString();
+                document.getElementById('audit-duplicates').innerText = dupes;
+                document.getElementById('audit-imputed').innerText = imputed;
+                document.getElementById('audit-health-score').innerText = `${health}%`;
+            }
+
+            populateFilterDropdowns() {
+                const deptSelect = document.getElementById('filter-department');
+                const depts = [...new Set(this.rawData.map(d => d.department))];
+                deptSelect.innerHTML = '<option value="ALL">All Departments</option>';
+                depts.forEach(d => { deptSelect.innerHTML += `<option value="${d}">${d}</option>`; });
+            }
+
+            applyFilters() {
+                const dept = document.getElementById('filter-department').value;
+                const gender = document.getElementById('filter-gender').value;
+                const location = document.getElementById('filter-location').value;
+                const attrition = document.getElementById('filter-attrition').value;
+
+                this.filteredData = this.rawData.filter(emp => {
+                    if (dept !== 'ALL' && emp.department !== dept) return false;
+                    if (gender !== 'ALL' && emp.gender !== gender) return false;
+                    if (location !== 'ALL' && emp.location !== location) return false;
+                    if (attrition !== 'ALL' && emp.status !== attrition) return false;
+                    return true;
+                });
+
+                this.renderAll();
+            }
+
+            resetFilters() {
+                document.getElementById('filter-department').value = 'ALL';
+                document.getElementById('filter-gender').value = 'ALL';
+                document.getElementById('filter-location').value = 'ALL';
+                document.getElementById('filter-attrition').value = 'ALL';
+                this.applyFilters();
+            }
+
+            renderAll() {
+                this.renderKPIs();
+                this.renderWorkforceTable();
+                this.renderAllCharts();
+                this.render9BoxGrid();
+                this.updatePivotTable();
+            }
+
+            handleSearch(query) {
+                const q = query.toLowerCase();
+                this.filteredData = this.rawData.filter(emp => emp.name.toLowerCase().includes(q) || emp.empId.toLowerCase().includes(q));
+                this.renderWorkforceTable();
+            }
+
+            sortTable(col) {
+                if (this.sortColumn === col) this.sortAscending = !this.sortAscending;
+                else { this.sortColumn = col; this.sortAscending = true; }
+                this.renderWorkforceTable();
+            }
+
+            changePage(delta) {
+                this.currentPage += delta;
+                this.renderWorkforceTable();
+            }
+
+            openEmployeeModal(emp = null) {
+                document.getElementById('employee-modal').classList.remove('hidden');
+            }
+
+            closeEmployeeModal() {
+                document.getElementById('employee-modal').classList.add('hidden');
+            }
+
+            editEmployee(empId) {
+                const emp = this.rawData.find(e => e.empId === empId);
+                if (emp) this.openEmployeeModal(emp);
+            }
+
+            deleteEmployee(empId) {
+                this.rawData = this.rawData.filter(e => e.empId !== empId);
+                this.applyFilters();
+            }
+
+            saveEmployeeForm(e) {
+                e.preventDefault();
+                this.closeEmployeeModal();
+            }
+
+            switchTab(tabId) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('border-brand-custom', 'text-brand-custom', 'font-bold');
+                    btn.classList.add('border-transparent', 'text-slate-400');
+                });
+
+                document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+                const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+                activeBtn.classList.remove('border-transparent', 'text-slate-400');
+                activeBtn.classList.add('border-brand-custom', 'text-brand-custom', 'font-bold');
+
+                if (tabId === 'pivot-engine') this.updatePivotTable();
+            }
+        }
+
+        let app;
+        window.onload = function() {
+            app = new CommercialHRAnalyticsApp();
+            app.generateSampleData(1000);
+        };
+    </script>
+</body>
+</html>
